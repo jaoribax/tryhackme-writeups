@@ -1,7 +1,7 @@
 # tryhackme write-ups
  
 > personal documentation of CTF rooms completed on TryHackMe.
-> focus: methodology, tooling, and lessons learned — not just answers.
+> focus: methodology, tooling, and lessons learned.
  
 ---
  
