@@ -1,625 +1,433 @@
 # Biohazard — TryHackMe
-
+ 
 > **Difficulty:** Medium  
-> **Category:** Web Enumeration · Steganography · Cryptography · Privilege Escalation  
-> **Room:** Biohazard  
-> **Platform:** TryHackMe
-
+> **Category:** Web Enumeration · Cryptography · Steganography · Privilege Escalation  
+> **Date:** 2025-07-12  
+> **Room:** https://tryhackme.com/room/biohazard
+ 
 ---
-
-# Overview
-
-A sala **Biohazard** do TryHackMe utiliza uma temática baseada em Resident Evil para simular uma invasão em uma mansão.
-
-O objetivo é realizar a enumeração inicial, descobrir caminhos escondidos na aplicação web, resolver uma sequência de desafios envolvendo encoding/criptografia, obter acesso ao FTP através de credenciais descobertas, utilizar esteganografia para recuperar credenciais SSH e finalizar realizando uma escalação de privilégio até root.
-
-A máquina não depende de exploits complexos de serviços. O foco principal é:
-
-- Enumeração web
-- Análise de código fonte
-- Reconhecimento de padrões de encoding
-- Steganografia
-- Gestão de informações durante um pentest
-- Enumeração pós-exploração
-- Privilege escalation via má configuração
-
+ 
+## overview
+ 
+Sala temática de Resident Evil. A proposta não é explorar vulnerabilidades de serviço — é seguir uma cadeia longa de pistas escondidas em diretórios web, decodificar criptografias encadeadas, extrair dados via steganografia de imagens e só então obter acesso SSH. A escalação final para root vem de uma misconfiguration crítica de sudo. A sala exige atenção a detalhes desde o início: informações coletadas cedo se tornam chaves de decriptação muito mais tarde.
+ 
 ---
-
-# Reconnaissance
-
-O primeiro passo foi realizar uma enumeração dos serviços disponíveis.
-
+ 
+## reconnaissance
+ 
 ```bash
-nmap -sC -sV -p21,22,80 -T4 <TARGET_IP>
+nmap -sC -sV -p- <TARGET_IP>
 ```
-
-Resultado:
-
-| Porta | Serviço | Versão |
+ 
+| porta | serviço | versão |
 |---|---|---|
-| 21/tcp | FTP | vsftpd 3.0.3 |
-| 22/tcp | SSH | OpenSSH 7.6p1 |
-| 80/tcp | HTTP | Apache |
-
-Inicialmente temos três possíveis vetores:
-
-- FTP
-- SSH
-- Aplicação Web
-
-Como não possuímos credenciais, o foco inicial foi a aplicação HTTP.
-
+| 21/tcp | ftp | vsftpd 3.0.3 |
+| 22/tcp | ssh | OpenSSH 7.6p1 |
+| 80/tcp | http | Apache |
+ 
+FTP sem login anônimo. SSH sem credenciais ainda. Ponto de entrada: porta 80.
+ 
 ---
-
-# Web Enumeration
-
-## /mansionmain/
-
-A página inicial da aplicação apresenta uma referência à mansão.
-
-Ao analisar o código fonte:
-
+ 
+## enumeration
+ 
+### Porta 80 — /mansionmain/
+ 
+A página inicial tem um link para `/mansionmain/`. Inspecionando o source code:
+ 
 ```html
 <!-- It is in the /diningRoom/ -->
 ```
-
-Foi identificado o primeiro caminho oculto:
-
-```
-/diningRoom/
-```
-
+ 
+A mansão começa a falar. Seguimos.
+ 
 ---
-
-# Dining Room
-
-Acessando:
-
-```
-http://<TARGET_IP>/diningRoom/
-```
-
-Encontramos:
-
-- Emblem flag
-- Um texto cifrado
-- Uma referência ao usuário:
-
-```
-rebecca
-```
-
-Esse nome é importante posteriormente.
-
-Também encontramos um hint codificado:
-
+ 
+### /diningRoom/ — emblem flag + hint base64
+ 
+O dining room tem um link para pegar o emblema na parede — isso gera o **emblem flag**.
+ 
+No source code há uma string em Base64:
+ 
 ```
 SG93IGFib3V0IHRoZSAvdGVhUm9vbS8=
 ```
-
-Realizando a decodificação Base64:
-
+ 
+Decodificando:
+ 
 ```bash
 echo "SG93IGFib3V0IHRoZSAvdGVhUm9vbS8=" | base64 -d
+# How about the /teaRoom/
 ```
-
-Resultado:
-
-```
-How about the /teaRoom/
-```
-
-Novo caminho descoberto:
-
-```
-/teaRoom/
-```
-
+ 
+ 
+ 
 ---
-
-# Tea Room
-
-Na Tea Room encontramos:
-
-- Lockpick flag
-- Nova indicação para outra sala
-
-A chave encontrada permite avançar para:
-
-```
-/artRoom/
-```
-
+ 
+### /teaRoom/ — lockpick flag
+ 
+O tea room contém o **lockpick flag** e uma nota indicando que Jill deve visitar o `/artRoom/`.
+ 
 ---
-
-# Art Room — Map Enumeration
-
-A Art Room contém um mapa da mansão.
-
-Esse mapa revela diversos diretórios:
-
+ 
+### /artRoom/ — mapa da mansão
+ 
+O art room revela um mapa com todos os diretórios:
+ 
 ```
-/diningRoom/
-/teaRoom/
-/artRoom/
-/barRoom/
-/diningRoom2F/
-/tigerStatusRoom/
-/galleryRoom/
-/studyRoom/
-/armorRoom/
-/attic/
+/diningRoom/    /teaRoom/       /artRoom/      /barRoom/
+/diningRoom2F/  /tigerStatusRoom/  /galleryRoom/
+/studyRoom/     /armorRoom/     /attic/
 ```
-
-Neste ponto foi possível realizar uma enumeração organizada das salas restantes.
-
+ 
+Roadmap completo. A partir daqui, enumeração sistemática sala por sala.
+ 
 ---
-
-# Bar Room
-
-A entrada da Bar Room exige o uso da lockpick encontrada anteriormente.
-
-Dentro dela encontramos uma string codificada.
-
-Identificando o padrão:
-
+ 
+### /barRoom/ — Base32 → music sheet flag → gold emblem
+ 
+A porta do bar room é travada. Usamos o **lockpick flag** para entrar.
+ 
+Dentro há uma nota com texto codificado em **Base32**. Decodificando via CyberChef:
+ 
 ```
-Base32
+Base32 → music sheet flag
 ```
-
-Decodificação:
-
+ 
+Submetendo o music sheet flag no piano da sala, surge um **gold emblem** na parede.
+ 
+Tentando o **gold emblem** diretamente no gold emblem slot não produz resultado. Porém, submetendo o **emblem original do dining room** no mesmo slot redireciona para uma página que revela o nome **"rebecca"** — anotado para uso posterior como chave de decriptação.
+ 
+---
+ 
+### /diningRoom/ — gold emblem slot → Vigenere → shield key
+ 
+Submetendo o **gold emblem** no dining room retorna um texto cifrado. Parece ROT13 mas não é — é **Vigenere Cipher** com a chave **"rebecca"** (obtida na etapa anterior, ao submeter o emblem original no slot do bar room).
+ 
+Decodificando:
+ 
+```
+Vigenere (key: rebecca) → "there is a shield key inside the dining room. The html page is called the_great_shield_key"
+```
+ 
+Navegamos para `/diningRoom/the_great_shield_key.html` e obtemos o **shield key flag**.
+ 
+---
+ 
+### /diningRoom2F/ — ROT13 → blue jewel
+ 
+Source code da página contém:
+ 
+```
+Lbh trg gur oyhr trz ol chfuvat gur fgnghro gb gur ybjre sybbe...
+```
+ 
+Aplicando **ROT13**:
+ 
+```
+"You get the blue gem by pushing the status to the lower floor. Visit sapphire.html"
+```
+ 
+Navegamos para `/diningRoom/sapphire.html` e obtemos o **blue jewel flag**.
+ 
+---
+ 
+### Coletando os 4 Crests
+ 
+Com os itens coletados, as salas restantes se abrem. Cada uma entrega um crest com encoding diferente. Ferramenta usada: **CyberChef**.
+ 
+**Crest 1 — /tigerStatusRoom/**
+Blue jewel desbloqueia a sala. Crest codificado duas vezes: **Base64 → Base32**.
+ 
+```
+Crest 1: RlRQIHVzZXI6IG
+```
+ 
+**Crest 2 — /galleryRoom/**
+Examinando a nota da galeria. Crest codificado em **Base32 → Base58**.
+ 
+```
+Crest 2: h1bnRlciwgRlRQIHBh
+```
+ 
+**Crest 3 — /armorRoom/**
+Shield key desbloqueia. Crest codificado três vezes: **Base64 → Binary → Hex → ASCII**.
+ 
+```
+Crest 3: c3M6IHlvdV9jYW50X2h
+```
+ 
+**Crest 4 — /attic/**
+Shield key desbloqueia. Crest codificado em **Base58 → Hex**.
+ 
+```
+Crest 4: pZGVfZm9yZXZlcg==
+```
+ 
+---
+ 
+### Combinando os 4 Crests → credenciais FTP
+ 
+Concatenando os quatro crests:
+ 
+```
+RlRQIHVzZXI6IGh1bnRlciwgRlRQIHBhc3M6IHlvdV9jYW50X2hpZGVfZm9yZXZlcg==
+```
+ 
+Decodificando de **Base64**:
+ 
 ```bash
-echo "<STRING>" | base32 -d
+echo "RlRQIHVzZXI6IGh1bnRlciwgRlRQIHBhc3M6IHlvdV9jYW50X2hpZGVfZm9yZXZlcg==" | base64 -d
+# FTP user: hunter, FTP pass: [censurado]
 ```
-
-Resultado:
-
-```
-Music Sheet
-```
-
-A music sheet permite acessar o puzzle do piano.
-
-Ao completar o puzzle:
-
-```
-Gold Emblem
-```
-
-é obtido.
-
+ 
 ---
-
-# Gold Emblem
-
-O Gold Emblem deve ser utilizado no slot encontrado anteriormente no Dining Room.
-
-Após inserir o emblema recebemos:
-
-- Blue Gem
-- Uma mensagem cifrada
-
-A cifra utilizada era:
-
-```
-ROT13
-```
-
-Decodificação:
-
-```bash
-echo "<TEXT>" | tr 'A-Za-z' 'N-ZA-Mn-za-m'
-```
-
----
-
-# Obtendo os Crests
-
-A mansão possui quatro crests necessários para continuar.
-
-Cada um utiliza um método diferente de encoding.
-
----
-
-## Tiger Status Room
-
-Método:
-
-```
-Base64
-```
-
----
-
-## Gallery Room
-
-Método:
-
-```
-Base58
-```
-
----
-
-## Armor Room
-
-Método:
-
-```
-Base64
-→ Binary
-→ Hex
-→ ASCII
-```
-
----
-
-## Attic
-
-Método:
-
-```
-Base32
-```
-
----
-
-# Montando os Crests
-
-Após coletar os quatro valores, eles devem ser concatenados.
-
-O resultado é novamente um Base64:
-
-```bash
-echo "<CRESTS>" | base64 -d
-```
-
-Resultado:
-
-Credenciais FTP.
-
-```
-username: hunter
-password: <obtida>
-```
-
----
-
-# FTP Enumeration
-
-Com as credenciais:
-
+ 
+## exploitation
+ 
+### FTP — steganografia nas imagens
+ 
 ```bash
 ftp hunter@<TARGET_IP>
+mget *
 ```
-
-Arquivos encontrados:
-
+ 
+Arquivos baixados:
+ 
 ```
 important.txt
-maps.jpg
-albert.jpg
+001-key.jpg
+002-key.jpg
+003-key.jpg
+helmet_key.txt.gpg
 ```
-
-O arquivo `important.txt` indicava a existência de informações escondidas.
-
-Os arquivos de imagem foram analisados utilizando esteganografia.
-
+ 
+`important.txt` — nota de Barry para Jill mencionando um `/hidden_closet/` e que a helmet key está em algum arquivo.
+ 
+As três imagens carregam dados ocultos via steganografia:
+ 
+**001-key.jpg — steghide sem passphrase:**
+ 
+```bash
+steghide extract -sf 001-key.jpg
+# extrai key-001.txt → cGxhbnQ0Ml9jYW
+```
+ 
+**002-key.jpg — strings:**
+ 
+```bash
+strings 002-key.jpg | grep -i comment
+# Comment: 5fYmVfZGVzdHJveV8
+```
+ 
+**003-key.jpg — binwalk (steghide pediu passphrase):**
+ 
+```bash
+binwalk -e 003-key.jpg
+# extrai key-003.txt → 3aXRoX3Zqb2x0
+```
+ 
+Concatenando as três partes e decodificando de **Base64**:
+ 
+```bash
+echo "cGxhbnQ0Ml9jYW5fYmVfZGVzdHJveV93aXRoX3Zqb2x0" | base64 -d
+# resultado: [censurado]
+```
+ 
+Essa é a passphrase para descriptografar o arquivo GPG:
+ 
+```bash
+gpg helmet_key.txt.gpg
+# passphrase: [censurado]
+# resultado: helmet key flag
+```
+ 
 ---
-
-# Steganography
-
-Ferramenta utilizada:
-
+ 
+### /studyRoom/ + /hidden_closet/ → credenciais SSH
+ 
+Com o **helmet key flag**, desbloqueamos o Study Room.
+ 
+Dentro há um arquivo `doom.tar.gz` para download:
+ 
 ```bash
-steghide
+gunzip doom.tar.gz
+tar -xf doom.tar
+# extrai eagle_medal.txt → SSH user: umbrella_guest
 ```
-
-Extração:
-
-```bash
-steghide extract -sf maps.jpg
+ 
+No `/hidden_closet/`, usando o helmet key, encontramos o **MO Disk 1** com mensagem codificada em **Vigenere** (chave: albert):
+ 
 ```
-
-e:
-
-```bash
-steghide extract -sf albert.jpg
+wpbwbxr wpkzg pltwnhro, txrks_xfqsxrd_bvv_fy_rvmexa_ajk
+→ albert weasker password: [censurado]
 ```
-
-O arquivo `albert.jpg` solicitava uma passphrase.
-
-Durante a enumeração inicial havia sido encontrado o nome:
-
+ 
+Ainda no hidden closet, o **wolf medal** revela:
+ 
 ```
-rebecca
+SSH password: T_virus_rules
 ```
-
-Utilizando:
-
+ 
+Credenciais SSH obtidas:
+ 
 ```
-rebecca
+usuário: umbrella_[censurado]
+senha:   [censurado]
 ```
-
-como senha foi possível extrair as informações escondidas.
-
-Resultado:
-
-Credenciais SSH.
-
-```
-username: weasker
-password: <obtida>
-```
-
+ 
 ---
-
-# Initial Access
-
-Acesso via SSH:
-
+ 
+### SSH — acesso inicial e pivô para weasker
+ 
 ```bash
-ssh weasker@<TARGET_IP>
+ssh umbrella_guest@<TARGET_IP>
 ```
-
-Shell obtido:
-
+ 
+Dentro do home há um diretório oculto `.jailcell` com `chris.txt` — narrativa do CTF. No final do arquivo:
+ 
 ```
-weasker@umbrella_corp:~$
+MO disk 2: albert
 ```
-
+ 
+Verificando os outros usuários em `/home`: **hunter** e **weasker**.
+ 
+Mudando para weasker com a senha obtida no MO Disk 1:
+ 
+```bash
+su weasker
+# senha: [censurado]
+```
+ 
 ---
-
-# Privilege Escalation
-
-Primeiro passo:
-
+ 
+## privilege escalation
+ 
+### Enumeração pós-acesso
+ 
 ```bash
 id
 ```
-
-Resultado:
-
+ 
 ```
-uid=1000(weasker)
-gid=1000(weasker)
-
-groups:
-sudo
-adm
-cdrom
-dip
-plugdev
-lpadmin
-sambashare
+uid=1000(weasker) gid=1000(weasker) groups=1000(weasker),4(adm),24(cdrom),27(sudo)...
 ```
-
-O usuário pertence ao grupo:
-
-```
-sudo
-```
-
-Então verificamos permissões:
-
+ 
+Grupo `sudo` presente — verificação imediata:
+ 
 ```bash
 sudo -l
 ```
-
-Resultado:
-
+ 
 ```
 User weasker may run the following commands on umbrella_corp:
-
-(ALL : ALL) ALL
+    (ALL : ALL) ALL
 ```
-
----
-
-# Vulnerability Analysis
-
-A configuração encontrada permite que o usuário execute qualquer comando como qualquer usuário.
-
-Na prática:
-
-```
-weasker → qualquer comando → root
-```
-
-Essa é uma vulnerabilidade de configuração do sudo.
-
-Classificação:
-
-```
-Sudo Privilege Misconfiguration
-```
-
-MITRE ATT&CK:
-
-```
-T1548.003
-Abuse Elevation Control Mechanism: Sudo
-```
-
-Impacto:
-
-```
-Critical
-```
-
----
-
-# Root Access
-
-Escalação:
-
+ 
+### Análise da vulnerabilidade
+ 
+`(ALL : ALL) ALL` significa: qualquer comando, como qualquer usuário, sem restrição. Weasker tem controle administrativo total. Nenhum exploit adicional necessário — a misconfiguration é o caminho.
+ 
+> **Vulnerability:** Sudo Privilege Misconfiguration  
+> **MITRE ATT&CK:** T1548.003 — Abuse Elevation Control Mechanism: Sudo  
+> **Severity:** Critical
+ 
+### Execução
+ 
 ```bash
-sudo su -
+sudo su
 ```
-
-Resultado:
-
+ 
 ```
 root@umbrella_corp:~#
 ```
-
-A flag final estava disponível:
-
+ 
+---
+ 
+## flags
+ 
 ```bash
 cat /root/root.txt
+# flag: [censurado]
 ```
-
-Resultado:
-
-```
-flag:
-3c5794a00dc56c35f2bf096571edf3bf
-```
-
+ 
 ---
-
-# Attack Chain
-
+ 
+## attack chain
+ 
 ```
-Nmap
- |
- |-- FTP
- |-- SSH
- |-- HTTP
-        |
-        v
-/mansionmain/
-        |
-        v
-/diningRoom/
-        |
-        v
-Base64 Hint
-        |
-        v
-/teaRoom/
-        |
-        v
-/artRoom/
-        |
-        v
-Mapa da mansão
-        |
-        v
-Puzzles + Encodings
-        |
-        v
-4 Crests
-        |
-        v
-Credenciais FTP
-        |
-        v
-FTP Enumeration
-        |
-        v
-Steghide
-        |
-        v
-SSH Credentials
-        |
-        v
-SSH Access
-        |
-        v
-sudo -l
-        |
-        v
-sudo su -
-        |
-        v
-Root Flag
+Nmap → 21 (FTP) · 22 (SSH) · 80 (HTTP)
+          │
+          ▼
+/mansionmain/ → source code → /diningRoom/
+          │
+          ▼
+emblem flag + Base64 → /teaRoom/
+          │
+          ▼
+lockpick flag → /artRoom/ → mapa da mansão
+          │
+          ▼
+/barRoom/ (lockpick) → Base32 → music sheet → gold emblem
+          │
+          ▼
+emblem original no bar room slot → nome "rebecca"
+          │
+          ▼
+gold emblem no diningRoom → Vigenere (key: rebecca) → shield key
+          │
+          ▼
+/diningRoom2F/ → ROT13 → blue jewel
+          │
+          ▼
+4 Crests (Base64·Base32 / Base32·Base58 / Base64·Bin·Hex / Base58·Hex)
+          │
+          ▼
+Crests concatenados → Base64 → FTP: hunter / you_cant_hide_forever
+          │
+          ▼
+FTP → 3 imagens → steghide + strings + binwalk → chave GPG
+          │
+          ▼
+GPG decrypt → helmet key flag
+          │
+          ▼
+/studyRoom/ → doom.tar.gz → SSH user: umbrella_guest
+/hidden_closet/ → Vigenere autosolve → weasker password
+                → wolf medal → SSH pass: T_virus_rules
+          │
+          ▼
+SSH (umbrella_guest) → .jailcell/chris.txt → MO disk 2: albert
+          │
+          ▼
+su weasker (stars_members_are_my_guinea_pig)
+          │
+          ▼
+sudo -l → (ALL : ALL) ALL → sudo su → root
+          │
+          ▼
+root.txt → flag capturada
 ```
-
+ 
 ---
-
-# Lessons Learned
-
-## 1. Informações aparentemente inúteis podem ser essenciais
-
-O nome:
-
-```
-rebecca
-```
-
-aparece muito cedo na enumeração.
-
-Naquele momento parece apenas uma informação narrativa, porém posteriormente se torna a chave da esteganografia.
-
-Durante um pentest real, qualquer informação coletada deve ser registrada.
-
----
-
-## 2. Encoding não é criptografia
-
-Durante a máquina foram utilizados:
-
-- Base32
-- Base58
-- Base64
-
-Esses formatos apenas representam dados de outra maneira.
-
-Eles não fornecem segurança.
-
----
-
-## 3. A complexidade do ataque não significa que o último passo será complexo
-
-Após uma longa cadeia de enumeração, a escalação final foi extremamente simples.
-
-A vulnerabilidade:
-
-```
-(ALL : ALL) ALL
-```
-
-entrega privilégios administrativos completos.
-
----
-
-# Remediation
-
-A configuração insegura:
-
-```
+ 
+## what I learned
+ 
+Essa sala tem uma cadeia longa demais para ser resolvida sem anotações. O nome **"rebecca"** aparece logo no início e só se torna relevante como chave Vigenere muito depois — quem não anotou ficou preso. Isso é um comportamento real de reconhecimento: informações que parecem decorativas no início do engagement frequentemente são críticas no final.
+ 
+Outro ponto relevante: as três técnicas de extração usadas nas imagens (steghide, strings, binwalk) serviram para contornar diferentes cenários — steghide pediu passphrase em uma das imagens, o que forçou o uso de binwalk como alternativa. Em pentest real, ter mais de uma ferramenta para o mesmo objetivo é essencial.
+ 
+A escalação via sudo foi trivial depois de toda a complexidade da cadeia. Isso acontece: ambientes com configuração de sudo irrestrita para um usuário comprometido entregam root imediatamente, independente de qual foi o caminho de acesso inicial.
+ 
+**Remediação:**
+ 
+```bash
+# Configuração insegura encontrada
 weasker ALL=(ALL:ALL) ALL
+ 
+# Correto — princípio do menor privilégio
+weasker ALL=(root) NOPASSWD: /usr/bin/systemctl restart apache2
 ```
-
-deve ser evitada.
-
-Aplicar princípio do menor privilégio:
-
-Exemplo:
-
-```
-weasker ALL=(root) /usr/bin/systemctl restart apache2
-```
-
-Recomendações:
-
-- Revisar regularmente `/etc/sudoers`
-- Remover usuários desnecessários do grupo sudo
-- Aplicar Least Privilege
-- Monitorar alterações administrativas
-
----
-
-# Final Result
-
-Privilege escalation concluída.
-
-Root obtido.
-
-Flag:
-
-```
-3c5794a00dc56c35f2bf096571edf3bf
-```
+ 
+Revisar `/etc/sudoers` regularmente, remover usuários desnecessários do grupo `sudo` e nunca manter permissões temporárias sem prazo de expiração.
+ 
