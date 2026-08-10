@@ -1,6 +1,6 @@
 # Beach Bar — TryHackMe
 
-> **Difficulty:** Medium  
+> **Difficulty:** Easy  
 > **Category:** Web Exploitation · Insecure Deserialization · Information Disclosure · Privilege Escalation  
 > **Date:** 2025-08-05  
 > **Room:** [https://tryhackme.com/room/beachbar](https://tryhackme.com/room/hh-beachbar-d849f7f7)
