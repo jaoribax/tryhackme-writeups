@@ -9,4 +9,4 @@
  
 | room | difficulty | category | date | writeup |
 |---|---|---|---|---|
-| _(coming soon)_ | — | — | — | — |
+| Biohazard | Medium | Web · Crypto · Stego · Privesc | 2025-07-12 | [ver](medium/Biohazard) |
